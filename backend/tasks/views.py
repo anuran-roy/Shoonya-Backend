@@ -31,8 +31,7 @@ def annotation_result_compare(base_annotation_result, review_annotation_result):
     review_result = [{i:d[i] for i in d if i!='id'} for d in review_annotation_result]
     review_result = sorted(review_result, key=lambda d:d['from_name'])
 
-    is_modified = any(x != y for x, y in zip(base_result, review_result))
-    return is_modified
+    return any(x != y for x, y in zip(base_result, review_result))
 
 class TaskViewSet(viewsets.ModelViewSet, mixins.ListModelMixin):
     """
@@ -122,30 +121,35 @@ class TaskViewSet(viewsets.ModelViewSet, mixins.ListModelMixin):
             if is_review_mode:
                 if request.user in Project.objects.get(id=request.query_params["project_id"]).annotation_reviewers.all():
                     queryset = Task.objects.filter(project_id__exact=request.query_params["project_id"]).filter(review_user=user.id)
-                    
-                elif request.user.role == User.WORKSPACE_MANAGER or request.user.role == User.ORGANIZAION_OWNER :
-                    if "user_filter" in dict(request.query_params):
-                        queryset = Task.objects.filter(
+
+                elif request.user.role in [
+                    User.WORKSPACE_MANAGER,
+                    User.ORGANIZAION_OWNER,
+                ]:
+                    queryset = (
+                        Task.objects.filter(
                             project_id__exact=request.query_params["project_id"]
                         ).filter(review_user=request.query_params["user_filter"])
-                    else:
-                        queryset = Task.objects.filter(project_id__exact=request.query_params["project_id"])
-                else:
-                    return Response({"message": "You do not have access!"}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                if request.user.role == User.ANNOTATOR and not user_obj.is_superuser:
-                    queryset = Task.objects.filter(
-                        project_id__exact=request.query_params["project_id"]
-                    ).filter(annotation_users=user.id)
-                else:
-                    if "user_filter" in dict(request.query_params):
-                        queryset = Task.objects.filter(
-                            project_id__exact=request.query_params["project_id"]
-                        ).filter(annotation_users=request.query_params["user_filter"])
-                    else:
-                        queryset = Task.objects.filter(
+                        if "user_filter" in dict(request.query_params)
+                        else Task.objects.filter(
                             project_id__exact=request.query_params["project_id"]
                         )
+                    )
+
+                else:
+                    return Response({"message": "You do not have access!"}, status=status.HTTP_400_BAD_REQUEST)
+            elif request.user.role == User.ANNOTATOR and not user_obj.is_superuser:
+                queryset = Task.objects.filter(
+                    project_id__exact=request.query_params["project_id"]
+                ).filter(annotation_users=user.id)
+            elif "user_filter" in dict(request.query_params):
+                queryset = Task.objects.filter(
+                    project_id__exact=request.query_params["project_id"]
+                ).filter(annotation_users=request.query_params["user_filter"])
+            else:
+                queryset = Task.objects.filter(
+                    project_id__exact=request.query_params["project_id"]
+                )
 
         else:
             queryset = Task.objects.all()
@@ -156,7 +160,7 @@ class TaskViewSet(viewsets.ModelViewSet, mixins.ListModelMixin):
                 request.GET, "data", list(queryset.first().data.keys())
             )
         )
-        
+
         if "page" in dict(request.query_params):
             page = request.query_params["page"]
             if int(page) == 0:
@@ -165,9 +169,7 @@ class TaskViewSet(viewsets.ModelViewSet, mixins.ListModelMixin):
                 data = serializer.data
                 return Response(data)
 
-        task_status = UNLABELED
-        if is_review_mode:
-            task_status = LABELED
+        task_status = LABELED if is_review_mode else UNLABELED
         if "task_status" in dict(request.query_params):
             queryset = queryset.filter(task_status=request.query_params["task_status"])
             task_status = request.query_params["task_status"]
@@ -190,15 +192,12 @@ class TaskViewSet(viewsets.ModelViewSet, mixins.ListModelMixin):
                     "data": data,
                 }
             )
-        
+
         project_details = Project.objects.filter(id=request.query_params["project_id"])
         project_type =  project_details[0].project_type
         project_type =  project_type.lower()
-        is_translation_project = True if  "translation" in  project_type else False
-        
-        # if (is_translation_project) and (page is not None) and ({DRAFT, LABELED,  REJECTED}):
-            # To be done for annotation_mode
-        
+        is_translation_project = "translation" in project_type
+
         if (is_translation_project) and (page is not None) and (task_status in {ACCEPTED, ACCEPTED_WITH_CHANGES}):
             # Shows annotations for review_mode
             serializer = TaskAnnotationSerializer(page, many=True)
@@ -242,9 +241,8 @@ class AnnotationViewSet(
 
     def create(self, request):
         # TODO: Correction annotation to be filled by validator
-        if "mode" in dict(request.data):
-            if request.data["mode"] == "review":
-                return self.create_review_annotation(request)
+        if "mode" in dict(request.data) and request.data["mode"] == "review":
+            return self.create_review_annotation(request)
 
         return self.create_base_annotation(request)
 
@@ -348,8 +346,9 @@ class AnnotationViewSet(
         annotation = Annotation.objects.get(pk=annotation_id)
         if review_status == ACCEPTED:
             task.correct_annotation = annotation
-            is_modified = annotation_result_compare(annotation.parent_annotation.result, annotation.result)
-            if is_modified:
+            if is_modified := annotation_result_compare(
+                annotation.parent_annotation.result, annotation.result
+            ):
                 review_status = ACCEPTED_WITH_CHANGES
         task.task_status = review_status
         task.save()
@@ -371,11 +370,7 @@ class AnnotationViewSet(
         annotation = Annotation.objects.get(pk=annotation_id)
         task = annotation.task
 
-        if not annotation.parent_annotation:
-            is_review = False
-        else:
-            is_review = True
-
+        is_review = bool(annotation.parent_annotation)
         # Base annotation update
         if not is_review:
             if request.user not in task.annotation_users.all():
@@ -394,7 +389,6 @@ class AnnotationViewSet(
                         task.task_status = ACCEPTED
             else:
                 task.task_status = request.data["task_status"]
-        # Review annotation update
         else:
             if "review_status" in dict(request.data) and request.data["review_status"] in [ACCEPTED, REJECTED]:
                 review_status = request.data["review_status"]
@@ -410,8 +404,9 @@ class AnnotationViewSet(
 
             if review_status == ACCEPTED:
                 task.correct_annotation = annotation
-                is_modified = annotation_result_compare(annotation.parent_annotation.result, annotation.result)
-                if is_modified:
+                if is_modified := annotation_result_compare(
+                    annotation.parent_annotation.result, annotation.result
+                ):
                     review_status = ACCEPTED_WITH_CHANGES
             else:
                 task.correct_annotation = None
@@ -470,5 +465,4 @@ class PredictionViewSet(
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     def create(self, request):
-        prediction_response = super().create(request)
-        return prediction_response
+        return super().create(request)

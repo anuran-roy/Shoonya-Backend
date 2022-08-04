@@ -44,7 +44,7 @@ class Organization(models.Model):
     updated_at = models.DateTimeField(verbose_name="updated_at", auto_now=True)
 
     def __str__(self):
-        return self.title + ", id=" + str(self.pk)
+        return f"{self.title}, id={str(self.pk)}"
 
     @classmethod
     def create_organization(
@@ -97,7 +97,7 @@ class Invite(models.Model):
     invite_code = models.CharField(verbose_name="invite_code", max_length=256, null=True, unique=True)
 
     def __str__(self):
-        return  str(self.user.email) + " for " + str(self.organization.title) + " organization"
+        return f"{str(self.user.email)} for {str(self.organization.title)} organization"
 
     @classmethod
     def create_invite(cls, organization=None, users=None):
@@ -123,4 +123,7 @@ class Invite(models.Model):
 
     @classmethod
     def generate_invite_code(cls):
-        return "".join(secrets.choice(string.ascii_uppercase + string.digits) for i in range(10))
+        return "".join(
+            secrets.choice(string.ascii_uppercase + string.digits)
+            for _ in range(10)
+        )

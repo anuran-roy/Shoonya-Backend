@@ -105,15 +105,10 @@ def get_project_pull_status(pk):
     # Create the keyword argument for project ID
     project_id_keyword_arg = "'project_id': " + "'" + str(pk) + "'"
 
-    # Check the celery project export status
-    taskresult_queryset = TaskResult.objects.filter(
+    if taskresult_queryset := TaskResult.objects.filter(
         task_name="projects.tasks.add_new_data_items_into_project",
         task_kwargs__contains=project_id_keyword_arg,
-    )
-
-    # If the celery TaskResults table returns
-    if taskresult_queryset:
-        
+    ):
         # Sort the tasks by newest items first by date
         taskresult_queryset = taskresult_queryset.order_by("-date_done")
 
@@ -153,18 +148,13 @@ def get_project_export_status(pk):
     # Create the keyword argument for project ID
     project_id_keyword_arg = "'project_id': " + "'" + str(pk) + "'" + ","
 
-    # Check the celery project export status
-    taskresult_queryset = TaskResult.objects.filter(
+    if taskresult_queryset := TaskResult.objects.filter(
         task_name__in=[
             "projects.tasks.export_project_in_place",
             "projects.tasks.export_project_new_record",
         ],
         task_kwargs__contains=project_id_keyword_arg,
-    )
-
-    # If the celery TaskResults table returns
-    if taskresult_queryset:
-
+    ):
         return extract_latest_status_date_time_from_taskresult_queryset(taskresult_queryset)
     return (
         "Success",
@@ -223,10 +213,9 @@ def get_unassigned_task_count(pk):
         .filter(task_status=UNLABELED)
         .annotate(annotator_count=Count("annotation_users"))
     )
-    task_count = tasks.filter(
+    return tasks.filter(
         annotator_count__lt=project.required_annotators_per_task
     ).count()
-    return task_count
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -402,10 +391,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         # Check if the endpoint is being accessed in review mode
         is_review_mode = "mode" in dict(request.query_params) and request.query_params["mode"] == "review"
-        if is_review_mode:
-            if not project.enable_task_reviews:
-                resp_dict = {"message": "Task reviews are not enabled for this project"}
-                return Response(resp_dict, status=status.HTTP_403_FORBIDDEN)
+        if is_review_mode and not project.enable_task_reviews:
+            resp_dict = {"message": "Task reviews are not enabled for this project"}
+            return Response(resp_dict, status=status.HTTP_403_FORBIDDEN)
 
         # Check if task_status is passed
         if "task_status" in dict(request.query_params):
@@ -446,9 +434,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     return Response(task_dict)
 
             ret_dict = {"message": "No more tasks available!"}
-            ret_status = status.HTTP_204_NO_CONTENT
-            return Response(ret_dict, status=ret_status)
-
         else:
             # Check if there are unattended tasks
             if user_role == 1 and not request.user.is_superuser:
@@ -486,8 +471,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
                     return Response(task_dict)
 
             ret_dict = {"message": "No more unlabeled tasks!"}
-            ret_status = status.HTTP_204_NO_CONTENT
-            return Response(ret_dict, status=ret_status)
+
+        ret_status = status.HTTP_204_NO_CONTENT
+        return Response(ret_dict, status=ret_status)
 
     @is_organization_owner_or_workspace_manager
     def create(self, request, *args, **kwargs):
@@ -648,11 +634,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
         serializer = ProjectUsersSerializer(project, many=False)
         users = serializer.data["users"]
-        user_ids = set()
-        for user in users:
-            user_ids.add(user["id"])
+        user_ids = {user["id"] for user in users}
         # verify if user belongs in project users
-        if not cur_user.id in user_ids:
+        if cur_user.id not in user_ids:
             return Response(
                 {"message": "You are not assigned to this project"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -686,7 +670,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         tasks_to_be_assigned = min(tasks_to_be_assigned, task_pull_count)
 
         lock_set = False
-        while(lock_set == False):
+        while not lock_set:
             if project.is_locked(ANNOTATION_LOCK):
                 sleep(settings.PROJECT_LOCK_RETRY_INTERVAL)
                 continue
@@ -754,15 +738,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return Response({"message": "Task reviews are disabled for this project"}, status=status.HTTP_403_FORBIDDEN)
         serializer = ProjectUsersSerializer(project, many=False)
         users = serializer.data["annotation_reviewers"]
-        user_ids = set()
-        for user in users:
-            user_ids.add(user["id"])
+        user_ids = {user["id"] for user in users}
         # verify if user belongs in annotation_reviewers for this project
-        if not cur_user.id in user_ids:
+        if cur_user.id not in user_ids:
             return Response({"message": "You are not assigned to review this project"}, status=status.HTTP_403_FORBIDDEN)
 
         lock_set = False
-        while(lock_set == False):
+        while not lock_set:
             if project.is_locked(REVIEW_LOCK):
                 sleep(settings.PROJECT_LOCK_RETRY_INTERVAL)
                 continue
@@ -798,9 +780,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Unassigns all labeled tasks from a reviewer.
         """
         user = request.user
-        project_id = pk
-
-        if project_id:
+        if project_id := pk:
             project_obj = Project.objects.get(pk=project_id)
             if project_obj and user in project_obj.annotation_reviewers.all():
                 tasks = Task.objects.filter(project_id__exact=project_id

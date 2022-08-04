@@ -127,15 +127,11 @@ class Task(models.Model):
     def set_lock(self, user):
         """Lock current task by specified user. Lock lifetime is set by `expire_in_secs`"""
         num_locks = self.num_locks
-        if num_locks < self.project_id.required_annotators_per_task:
-            lock_ttl = self.get_lock_ttl()
-            expire_at = now() + timedelta(seconds=lock_ttl)
-            TaskLock.objects.create(task=self, user=user, expire_at=expire_at)
-        else:
+        if num_locks >= self.project_id.required_annotators_per_task:
             raise Exception("Setting lock failed. Num locks > max annotators. Please call has_lock() before setting the lock.")
-            # logger.error(
-            #     f"Current number of locks for task {self.id} is {num_locks}, but overlap={self.overlap}: "
-            #     f"that's a bug because this task should not be taken in a label stream (task should be locked)")
+        lock_ttl = self.get_lock_ttl()
+        expire_at = now() + timedelta(seconds=lock_ttl)
+        TaskLock.objects.create(task=self, user=user, expire_at=expire_at)
         self.clear_expired_locks()
 
     def release_lock(self, user=None):
@@ -159,20 +155,6 @@ class Task(models.Model):
         # else:
         num_annotations = self.annotations.count()
 
-        # num = num_locks + num_annotations
-        # FIXME: hardcoded to 0 to disable locking mechanism for skipped tasks
-        num = 0
-
-        # if num > self.project_id.required_annotators_per_task:
-        #     logger.error(
-        #         f"Num takes={num} > overlap={self.project_id.required_annotators_per_task} for task={self.id} - it's a bug",
-        #         extra=dict(
-        #             lock_ttl=self.get_lock_ttl(),
-        #             num_locks=num_locks,
-        #             num_annotations=num_annotations,
-        #         )
-        #     )
-        result = bool(num >= self.project_id.required_annotators_per_task)
         # if user:
         #     # Check if user has already annotated a task
         #     if len(self.annotations.filter(completed_by__exact=user.id)) > 0:
@@ -180,7 +162,7 @@ class Task(models.Model):
         #     # Check if already locked by the same user
         #     if self.locks.filter(user=user).count() > 0:
         #         return True
-        return result
+        return self.project_id.required_annotators_per_task <= 0
 
     def __str__(self):
         return str(self.id)
@@ -374,7 +356,12 @@ class DataExport(object):
         now = datetime.now()
         data = json.dumps(tasks, ensure_ascii=False)
         md5 = hashlib.md5(json.dumps(data).encode('utf-8')).hexdigest()
-        name = 'project-' + str(project.id) + '-at-' + now.strftime('%Y-%m-%d-%H-%M') + f'-{md5[0:8]}'
+        name = (
+            f'project-{str(project.id)}-at-'
+            + now.strftime('%Y-%m-%d-%H-%M')
+            + f'-{md5[:8]}'
+        )
+
 
         input_json = DataExport.save_export_files(project, now, get_args, data, md5, name)
 
@@ -410,7 +397,12 @@ class DataExport(object):
         now = datetime.now()
         data = json.dumps(tasks, ensure_ascii=False)
         md5 = hashlib.md5(json.dumps(data).encode("utf-8")).hexdigest()
-        name = "project-" + str(project.id) + "-at-" + now.strftime("%Y-%m-%d-%H-%M") + f"-{md5[0:8]}"
+        name = (
+            f"project-{str(project.id)}-at-"
+            + now.strftime("%Y-%m-%d-%H-%M")
+            + f"-{md5[:8]}"
+        )
+
 
         input_json = DataExport.save_export_files(project, now, get_args, data, md5, name)
 
@@ -423,10 +415,9 @@ class DataExport(object):
         with get_temp_dir() as tmp_dir:
             converter.convert(input_json, tmp_dir, "CSV", is_dir=False)
             files = get_all_files_from_dir(tmp_dir)
-            # if only one file is exported - no need to create archive
-            if len(os.listdir(tmp_dir)) == 1:
-                output_file = files[0]
-                df = pd.read_csv(output_file)
+            if len(os.listdir(tmp_dir)) != 1:
+                raise NotImplementedError
+            output_file = files[0]
                 # tasks_annotations = json.load(output_file)
                 # ext = os.path.splitext(output_file)[-1]
                 # content_type = f'application/{ext}'
@@ -434,9 +425,7 @@ class DataExport(object):
 
                 # filename = name + os.path.splitext(output_file)[-1]
                 # return out, content_type, filename
-                return df
-            else:
-                raise NotImplementedError
+            return pd.read_csv(output_file)
 
             # otherwise pack output directory into archive
             # shutil.make_archive(tmp_dir, 'zip', tmp_dir)

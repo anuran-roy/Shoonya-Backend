@@ -131,7 +131,7 @@ def filter_data_items(project_type, dataset_instance_ids, filter_string, ids_to_
         filtered_items = list(
             filtered_items.values("id", *input_dataset_info["fields"])
         )
-    
+
     return filtered_items
 
 
