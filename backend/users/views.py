@@ -31,7 +31,10 @@ regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 
 def generate_random_string(length=12):
-    return "".join(secrets.choice(string.ascii_uppercase + string.digits) for i in range(length))
+    return "".join(
+        secrets.choice(string.ascii_uppercase + string.digits)
+        for _ in range(length)
+    )
 
 
 class InviteViewSet(viewsets.ViewSet):
@@ -71,13 +74,15 @@ class InviteViewSet(viewsets.ViewSet):
                 invalid_emails.append(email)
         if len(valid_user_emails) <= 0:
             return Response({"message": "No valid emails found"}, status=status.HTTP_400_BAD_REQUEST)
-        if len(invalid_emails) == 0:
-            ret_dict = {"message": "Invites sent"}
-            ret_status = status.HTTP_201_CREATED
-        else:
-            ret_dict = {"message": f"Invites sent partially! Invalid emails: {','.join(invalid_emails)}"}
-            ret_status = status.HTTP_201_CREATED
+        ret_dict = (
+            {
+                "message": f"Invites sent partially! Invalid emails: {','.join(invalid_emails)}"
+            }
+            if invalid_emails
+            else {"message": "Invites sent"}
+        )
 
+        ret_status = status.HTTP_201_CREATED
         users = User.objects.bulk_create(users)
 
         Invite.create_invite(organization=org, users=users)
@@ -254,17 +259,17 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         from_date = request.data.get('from_date')
         to_date = request.data.get('to_date')
-        from_date = from_date + ' 00:00'
-        to_date = to_date + ' 23:59'
+        from_date = f'{from_date} 00:00'
+        to_date = f'{to_date} 23:59'
 
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cond, invalid_message = is_valid_date(to_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         start_date = datetime.strptime(from_date, '%Y-%m-%d %H:%M')
         end_date = datetime.strptime(to_date, '%Y-%m-%d %H:%M')
 
@@ -274,7 +279,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         project_type = request.data.get("project_type")
         project_type_lower =  project_type.lower()
-        is_translation_project = True if  "translation" in  project_type_lower  else False
+        is_translation_project = "translation" in project_type_lower
         workspace_id = request.data.get("workspace_id")
 
         try:
@@ -300,7 +305,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
         project_objs = Project.objects.filter(workspace_id__in=workspace_id, users = request.user.id,project_type=project_type)
 
         final_result =[]
-        for  proj in project_objs:
+        for proj in project_objs:
 
             project_name = proj.title
             labeld_tasks_objs =Task.objects.filter(Q(project_id=proj.id) & Q(annotation_users= request.user.id ) & Q(task_status__in = ['accepted','rejected','accepted_with_changes','labeled']))
@@ -309,14 +314,15 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
             annotated_task_ids = list(labeld_tasks_objs.values_list('id',flat = True))
             annotated_labeled_tasks =Annotation.objects.filter(task_id__in = annotated_task_ids ,parent_annotation_id = None,\
-                updated_at__range = [start_date, end_date])
+                    updated_at__range = [start_date, end_date])
 
             annotated_tasks_count = annotated_labeled_tasks.count()
 
 
             avg_lead_time = 0
-            lead_time_annotated_tasks = [ eachtask.lead_time for eachtask in annotated_labeled_tasks]
-            if len(lead_time_annotated_tasks) > 0 :
+            if lead_time_annotated_tasks := [
+                eachtask.lead_time for eachtask in annotated_labeled_tasks
+            ]:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(lead_time_annotated_tasks)
                 avg_lead_time = round(avg_lead_time,2)
 
@@ -335,7 +341,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
                     & Q(annotation_users=request.user.id)
                 ).order_by("id")
             total_skipped_tasks = all_skipped_tasks_in_project.count()
- 
+
             all_pending_tasks_in_project_objs =  Task.objects.filter(Q(project_id = proj.id) & Q(task_status = "unlabeled") & Q(annotation_users = request.user.id) )
             all_pending_tasks_in_project = all_pending_tasks_in_project_objs.count()
 
@@ -366,7 +372,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
                     }
 
             final_result.append(result)
-    
+
         return Response(final_result)
 
 

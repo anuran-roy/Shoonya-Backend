@@ -61,8 +61,8 @@ def copy_from_block_text_to_sentence_text(request):
     for sentence_text in all_sentence_texts:
         sentence_text.save()
     # dataset_models.SentenceText.objects.bulk_create(all_sentence_texts)
-    
-    
+
+
     project.save()
     ret_dict = {"message": "SUCCESS!"}         
     ret_status = status.HTTP_200_OK
@@ -110,10 +110,11 @@ def copy_from_ocr_document_to_block_text(request):
             labels = ocr_document.annotation_labels
             labels = json.loads(labels)
 
-            body_transcriptions = []
-            for i,label in enumerate(labels):
-                if label['labels'][0] == 'Body':
-                    body_transcriptions.append(transcriptions[i])
+            body_transcriptions = [
+                transcriptions[i]
+                for i, label in enumerate(labels)
+                if label['labels'][0] == 'Body'
+            ]
 
             text = " ".join(body_transcriptions)
             # TODO: check if domain can be same as OCR domain
@@ -134,10 +135,10 @@ def copy_from_ocr_document_to_block_text(request):
     for block_text in all_block_texts:
         block_text.save()
     # dataset_models.SentenceText.objects.bulk_create(all_sentence_texts)
-    
+
     # project.metadata_json["copy_from_ocr_document_to_block_text"]=True
     # project.save()
-    ret_dict = {"message": "SUCCESS!"}         
+    ret_dict = {"message": "SUCCESS!"}
     ret_status = status.HTTP_200_OK
     return Response(ret_dict, status=ret_status)
 

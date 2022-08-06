@@ -17,22 +17,18 @@ def parse_for_data_types(string: str):
     except Exception:
         pass
 
-    if string.lower() in ["true", "false"]:
-        return bool(string)
-
-    return string  # If none work, return a string
+    return bool(string) if string.lower() in {"true", "false"} else string
 
 
 def extract_search_params(query_dict: dict) -> dict:
     """
     Extract the parameters from the request params that start with ```search_```
     """
-    new_dict: dict = {}
-    for i in query_dict.items():
-        if "search_" in i[0]:
-            new_dict[i[0][7:]] = unquote(i[1])
-
-    return new_dict
+    return {
+        i[0][7:]: unquote(i[1])
+        for i in query_dict.items()
+        if "search_" in i[0]
+    }
 
 
 def flatten(to_flatten: dict, sep: str = "__") -> dict:
@@ -70,13 +66,12 @@ def process_search_query(
                     ] = parsed_value  # Unaccent doesn't work as intended.
                 else:
                     queryset_dict[f"{search_field_name}__{i}"] = parsed_value
+            elif type(parsed_value) == str:
+                queryset_dict[
+                    f"{i}__icontains"
+                ] = parsed_value  # Unaccent is not supported for CharField
             else:
-                if type(parsed_value) != str:
-                    queryset_dict[i] = parse_for_data_types(j)
-                else:
-                    queryset_dict[
-                        f"{i}__icontains"
-                    ] = parsed_value  # Unaccent is not supported for CharField
+                queryset_dict[i] = parse_for_data_types(j)
     except Exception as e:
         print(f"\033[1mError found while processing query dictionary. In: {e}\033[0m")
 

@@ -19,18 +19,18 @@ class ProjectRegistry:
     @staticmethod
     def get_instance():
         """Static access method."""
-        if ProjectRegistry.__instance == None:
+        if ProjectRegistry.__instance is None:
             ProjectRegistry()
         return ProjectRegistry.__instance
 
     def __init__(self):
         """Virtually private constructor."""
-        if ProjectRegistry.__instance != None:
+        if ProjectRegistry.__instance is None:
+            ProjectRegistry.__instance = self
+
+        else:
             # Never instantiate more than once!
             raise Exception("This class is a singleton!")
-        else:
-            ProjectRegistry.__instance = self
-        
         with open(REGISTRY_PATH, "r", encoding="utf-8") as registry_fp:
             self.data = safe_load(registry_fp)
 
@@ -42,7 +42,7 @@ class ProjectRegistry:
         for domain_name, domain_data in self.data.items():
             for project_key, project_type in domain_data["project_types"].items():
                 assert project_key not in self.project_types, f"Project-type: `{project_key}` seems to be defined more than once"
-                
+
                 # Cache additional details
                 if project_type["project_mode"] == "Annotation":
                     label_studio_jsx_path = os.path.join(LABEL_STUDIO_JSX_PATH, project_type["label_studio_jsx_file"])
@@ -50,7 +50,7 @@ class ProjectRegistry:
                         project_type["label_studio_jsx_payload"] = f.read()
 
                 project_type["domain"] = domain_name
-                
+
                 self.project_types[project_key] = project_type
 
     def get_input_dataset_and_fields(self, project_type):

@@ -75,24 +75,24 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
         from_date = request.data.get('from_date')
         to_date = request.data.get('to_date')
-        from_date = from_date + ' 00:00'
-        to_date = to_date + ' 23:59'
+        from_date = f'{from_date} 00:00'
+        to_date = f'{to_date} 23:59'
         tgt_language = request.data.get('tgt_language')
         project_type = request.data.get("project_type")
         project_type_lower =  project_type.lower()
-        is_translation_project = True if  "translation" in  project_type_lower  else False
+        is_translation_project = "translation" in project_type_lower
         sort_by_column_name = request.data.get('sort_by_column_name')
         descending_order = request.data.get('descending_order')
-        if sort_by_column_name == None :
+        if sort_by_column_name is None:
             sort_by_column_name = "Annotator"
 
-        if descending_order == None :
+        if descending_order is None:
             descending_order = False
 
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cond, invalid_message = is_valid_date(to_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
@@ -103,11 +103,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if start_date > end_date:
             return Response({"message": "'To' Date should be after 'From' Date"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if tgt_language == None :
-            selected_language = '-'
-        else :
-            selected_language = tgt_language
-
+        selected_language = '-' if tgt_language is None else tgt_language
         result =[]
         for user in users:
             name = user.username
@@ -119,48 +115,49 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
             if tgt_language != None and tgt_language not in list_of_user_languages:
                 continue
-            if tgt_language == None :
-                
+            if tgt_language is None:
+
                 total_no_of_tasks_assigned = Task.objects.filter(project_id__in = proj_ids,annotation_users =user)
                 total_no_of_tasks_count = total_no_of_tasks_assigned.count()
-               
-                projects_objs = Project.objects.filter(users = user,project_type = project_type,organization_id = organization)
-                no_of_projects = projects_objs.count()
 
-            else :
+                projects_objs = Project.objects.filter(users = user,project_type = project_type,organization_id = organization)
+            else:
                 total_no_of_tasks_assigned = Task.objects.filter(project_id__in = proj_ids,annotation_users =user,\
-                    project_id__project_type = project_type,project_id__tgt_language=tgt_language,project_id__organization_id = organization)
+                        project_id__project_type = project_type,project_id__tgt_language=tgt_language,project_id__organization_id = organization)
                 total_no_of_tasks_count = total_no_of_tasks_assigned.count()
 
                 projects_objs = Project.objects.filter(users = user,project_type = project_type,\
-                    tgt_language = tgt_language,organization_id = organization)
-                no_of_projects = projects_objs.count()
-
+                        tgt_language = tgt_language,organization_id = organization)
+            no_of_projects = projects_objs.count()
 
             annotated_tasks = total_no_of_tasks_assigned.filter(task_status__in = ['accepted','rejected','accepted_with_changes','labeled'])
 
             annotated_task_ids = list(annotated_tasks.values_list('id',flat = True))
             annotated_labeled_tasks =Annotation.objects.filter(task_id__in = annotated_task_ids ,parent_annotation_id = None,\
-                updated_at__range = [start_date, end_date])
+                    updated_at__range = [start_date, end_date])
 
             annotated_tasks_count = annotated_labeled_tasks.count()
 
             avg_lead_time = 0
-            lead_time_annotated_tasks = [ eachtask.lead_time for eachtask in annotated_labeled_tasks]
-            if len(lead_time_annotated_tasks) > 0 :
+            if lead_time_annotated_tasks := [
+                eachtask.lead_time for eachtask in annotated_labeled_tasks
+            ]:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(lead_time_annotated_tasks)
 
             total_skipped_tasks = total_no_of_tasks_assigned.filter(task_status='skipped')
             total_skipped_tasks_count = total_skipped_tasks.count()
-        
+
             total_unlabeled_tasks = total_no_of_tasks_assigned.filter(task_status='unlabeled')
             total_unlabeled_tasks_count = total_unlabeled_tasks.count()
-        
+
             total_draft_tasks = total_no_of_tasks_assigned.filter(task_status='draft')
             total_draft_tasks_count = total_draft_tasks.count()
-        
 
-            no_of_workspaces_objs =len(set([ each_proj.workspace_id.id for each_proj in projects_objs]))
+
+            no_of_workspaces_objs = len(
+                {each_proj.workspace_id.id for each_proj in projects_objs}
+            )
+
 
 
             if is_translation_project:
@@ -195,11 +192,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                                 'Draft Tasks': total_draft_tasks_count,
                                 'Average Annotation Time (In Seconds)' : round(avg_lead_time,2)
                         } )
-        if not is_translation_project and sort_by_column_name == 'Word Count Of Annotated Tasks' :
+        if not is_translation_project and sort_by_column_name == 'Word Count Of Annotated Tasks':
             return Response({'message' : 'presently sort by word count for non translation projects not activated '})
-        else :
-            final_result = sorted(result, key=lambda x: x[sort_by_column_name],reverse=descending_order)
-            return Response(final_result)
+        final_result = sorted(result, key=lambda x: x[sort_by_column_name],reverse=descending_order)
+        return Response(final_result)
 
 
     @is_organization_owner
@@ -213,27 +209,27 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             return Response(
                 {"message": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
             )
-        
+
         from_date = request.data.get('from_date')
         to_date = request.data.get('to_date')
-        from_date = from_date + ' 00:00'
-        to_date = to_date + ' 23:59'
+        from_date = f'{from_date} 00:00'
+        to_date = f'{to_date} 23:59'
         tgt_language = request.data.get('tgt_language')
         project_type = request.data.get("project_type")
-        
+
 
         sort_by_column_name = request.data.get('sort_by_column_name')
         descending_order = request.data.get('descending_order')
-        if sort_by_column_name == None :
+        if sort_by_column_name is None:
             sort_by_column_name = "User Name"
 
-        if descending_order == None :
+        if descending_order is None:
             descending_order = False
 
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cond, invalid_message = is_valid_date(to_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
@@ -244,10 +240,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         if start_date > end_date:
             return Response({"message": "'To' Date should be after 'From' Date"}, status=status.HTTP_400_BAD_REQUEST)
 
-        if tgt_language == None :
+        if tgt_language is None:
             selected_language = '-'
             projects_obj  = Project.objects.filter(organization_id = organization,project_type = project_type)
-        else :
+        else:
             selected_language = tgt_language
             projects_obj  = Project.objects.filter(organization_id = organization,tgt_language = tgt_language,project_type = project_type)
         final_result = []
@@ -272,7 +268,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
                 labeled_count_tasks_ids = list(labeled_count_tasks.values_list('id',flat = True))
                 annotated_labeled_tasks =Annotation.objects.filter(task_id__in = labeled_count_tasks_ids ,parent_annotation_id = None,\
-                updated_at__range = [start_date, end_date])
+                    updated_at__range = [start_date, end_date])
 
                 labeled_count = annotated_labeled_tasks.count()
 

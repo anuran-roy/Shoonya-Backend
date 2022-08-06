@@ -15,13 +15,11 @@ class UserTestcase(APITestCase):
         # Setting up a dummy organization, dummy workspace and creating a user and a superuser for testing purposes.
         org1 = Organization.objects.create(title="Test Organization", id=11)
 
-        users = []
         user = User.objects.create_user(
             username="testUser", email="test@email.com", password="admin"
         )
         user.organization_id = 11
-        users.append(user)
-
+        users = [user]
         ws = Workspace.objects.create(
             organization=org1, workspace_name="Workspace_Test", id=2
         )

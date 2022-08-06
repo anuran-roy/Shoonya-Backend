@@ -35,10 +35,10 @@ class UnAssignManagerSerializer(serializers.Serializer):
 
     def validate_emails(self, usernames):
         users = User.objects.filter(username__in=usernames).all()
-        
+
         if len(users) != len(usernames):
             raise serializers.ValidationError("Enter existing user usernames")
-        
+
         return usernames
 
     def update(self, workspace, validated_data):

@@ -46,9 +46,7 @@ class Workspace(models.Model, DummyModelMixin):
         return str(self.workspace_name) 
 
     def has_user(self, user):
-        if self.user.filter(pk=user.pk).exists():
-            return True
-        return False
+        return bool(self.user.filter(pk=user.pk).exists())
 
     # def has_object_permission(self, user):
     #     if self.users.filter(pk=user.pk).exists():

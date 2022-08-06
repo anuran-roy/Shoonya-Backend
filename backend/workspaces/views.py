@@ -38,7 +38,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
-        if int(request.user.role) == User.ANNOTATOR or int(request.user.role) == User.WORKSPACE_MANAGER:
+        if int(request.user.role) in [User.ANNOTATOR, User.WORKSPACE_MANAGER]:
             data = self.queryset.filter(users=request.user, is_archived=False, organization=request.user.organization)
             try:
                 data = self.paginate_queryset(data)
@@ -215,7 +215,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
         API for getting all projects of a workspace
         """
         only_active=str(request.GET.get('only_active','false'))
-        only_active=True if only_active=='true' else False
+        only_active = only_active == 'true'
         try:
             workspace = Workspace.objects.get(pk=pk)
         except Workspace.DoesNotExist:
@@ -224,10 +224,10 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             projects = Project.objects.filter(users=request.user, workspace_id=workspace)
         else:
             projects = Project.objects.filter(workspace_id=workspace)
-        
-        if only_active==True:
+
+        if only_active:
             projects=projects.filter(is_archived=False)
-        
+
         serializer = ProjectSerializer(projects, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -252,11 +252,11 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             org_owner = org_obj.created_by.get_username()
         except :
             org_owner = ""
-        
+
         from_date = request.data.get('from_date')
         to_date = request.data.get('to_date')
-        from_date = from_date + ' 00:00'
-        to_date = to_date + ' 23:59'
+        from_date = f'{from_date} 00:00'
+        to_date = f'{to_date} 23:59'
         tgt_language = request.data.get('tgt_language')
         project_type = request.data.get("project_type")
         #enable_task_reviews = request.data.get("enable_task_reviews")
@@ -264,11 +264,11 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cond, invalid_message = is_valid_date(to_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         start_date = datetime.strptime(from_date, '%Y-%m-%d %H:%M')
         end_date = datetime.strptime(to_date, '%Y-%m-%d %H:%M')
 
@@ -276,9 +276,9 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             return Response({"message": "'To' Date should be after 'From' Date"}, status=status.HTTP_400_BAD_REQUEST)
 
         selected_language = "-"
-        if tgt_language == None :
+        if tgt_language is None:
             projects_objs = Project.objects.filter(workspace_id=pk, project_type = project_type)
-        else :
+        else:
             selected_language = tgt_language
             projects_objs = Project.objects.filter(workspace_id=pk, project_type = project_type,tgt_language = tgt_language)
         final_result=[]
@@ -302,7 +302,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
                 labeled_tasks_ids = list(labeled_tasks.values_list('id',flat = True))
                 annotated_labeled_tasks =Annotation.objects.filter(task_id__in = labeled_tasks_ids ,parent_annotation_id = None,\
-                updated_at__range = [start_date, end_date])
+                    updated_at__range = [start_date, end_date])
                 labeled_count = annotated_labeled_tasks.count()
 
 
@@ -353,8 +353,8 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
         from_date = request.data.get('from_date')
         to_date = request.data.get('to_date')
-        from_date = from_date + ' 00:00'
-        to_date = to_date + ' 23:59'
+        from_date = f'{from_date} 00:00'
+        to_date = f'{to_date} 23:59'
         tgt_language = request.data.get('tgt_language')
         #enable_task_reviews = request.data.get("enable_task_reviews")
 
@@ -362,11 +362,11 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cond, invalid_message = is_valid_date(to_date)
         if not cond:
             return Response({"message": invalid_message}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         start_date = datetime.strptime(from_date, '%Y-%m-%d %H:%M')
         end_date = datetime.strptime(to_date, '%Y-%m-%d %H:%M')
 
@@ -380,7 +380,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
         project_type = request.data.get("project_type")
         project_type_lower =  project_type.lower()
-        is_translation_project = True if  "translation" in  project_type_lower  else False
+        is_translation_project = "translation" in project_type_lower
         selected_language = "-"
         final_result =[]
         for index,each_user in enumerate(users_id):
@@ -392,36 +392,36 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             if tgt_language != None and tgt_language not in list_of_user_languages:
                 continue
 
-            if email == ws_owner or email == org_owner :
+            if email in [ws_owner, org_owner]:
                 continue
 
-            if tgt_language == None :
+            if tgt_language is None:
                 projects_objs = Project.objects.filter(workspace_id=pk, users = each_user,project_type = project_type)
-            else :
+            else:
                 selected_language = tgt_language
                 projects_objs = Project.objects.filter(workspace_id=pk, users = each_user,project_type = project_type,tgt_language = tgt_language)
             project_count = projects_objs.count()
             proj_ids = [eachid['id'] for eachid in projects_objs.values('id')]
-            
-    
+
+
             all_tasks_in_project = Task.objects.filter(Q(project_id__in=proj_ids) & Q(annotation_users= each_user ))
             assigned_tasks = all_tasks_in_project.count()
-            
+
 
             annotated_tasks_objs =Task.objects.filter(Q(project_id__in=proj_ids) & Q(annotation_users= each_user )\
-                    & Q(task_status__in = ['accepted','rejected','accepted_with_changes','labeled']))
+                        & Q(task_status__in = ['accepted','rejected','accepted_with_changes','labeled']))
 
             annotated_task_ids = list(annotated_tasks_objs.values_list('id',flat = True))
             annotated_labeled_tasks =Annotation.objects.filter(task_id__in = annotated_task_ids ,parent_annotation_id = None,\
-                updated_at__range = [start_date, end_date])
-                
+                    updated_at__range = [start_date, end_date])
+
             annotated_tasks = annotated_labeled_tasks.count()
-                
+
             lead_time_annotated_tasks = [ eachtask.lead_time for eachtask in annotated_labeled_tasks]
             avg_lead_time = 0
-            if len(lead_time_annotated_tasks) > 0 :
+            if lead_time_annotated_tasks:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(lead_time_annotated_tasks)
-                
+
             all_skipped_tasks_in_project = Task.objects.filter(
                     Q(project_id__in=proj_ids)
                     & Q(task_status="skipped")
@@ -464,9 +464,9 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
                     "Draft Tasks": all_draft_tasks_in_project,
                     "Average Annotation Time (In Seconds)" : round(avg_lead_time, 2)
                     }
-                    
+
             final_result.append(result)
-            
+
         return Response(final_result)
 
 
@@ -508,7 +508,13 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
         try:
             workspace = Workspace.objects.get(pk=pk)
 
-            if(((request.user.role) == (User.ORGANIZAION_OWNER) and (request.user.organization)==(workspace.organization)) or ((request.user.role==User.WORKSPACE_MANAGER) and (request.user in workspace.managers.all()))) == False:
+            if (
+                request.user.role != User.ORGANIZAION_OWNER
+                or request.user.organization != workspace.organization
+            ) and (
+                request.user.role != User.WORKSPACE_MANAGER
+                or request.user not in workspace.managers.all()
+            ):
                 return Response({"message": "Not authorized!"}, status=status.HTTP_403_FORBIDDEN)
 
             user_ids = user_id.split(',')
@@ -524,7 +530,7 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
                     invalid_user_ids.append(user_id)
 
             workspace.save()
-            if len(invalid_user_ids) == 0:
+            if not invalid_user_ids:
                 return Response({"message": "users added successfully"}, status=status.HTTP_200_OK)
             elif len(invalid_user_ids)==len(user_ids):
                 return Response({"message": "No valid user_ids found"}, status=status.HTTP_400_BAD_REQUEST)
@@ -568,7 +574,13 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
         try:
             workspace = Workspace.objects.get(pk=pk)
 
-            if(((request.user.role) == (User.ORGANIZAION_OWNER) and (request.user.organization) == (workspace.organization)) or ((request.user.role == User.WORKSPACE_MANAGER) and (request.user in workspace.managers.all()))) == False:
+            if (
+                request.user.role != User.ORGANIZAION_OWNER
+                or request.user.organization != workspace.organization
+            ) and (
+                request.user.role != User.WORKSPACE_MANAGER
+                or request.user not in workspace.managers.all()
+            ):
                 return Response({"message": "Not authorized!"}, status=status.HTTP_403_FORBIDDEN)
 
             try:
