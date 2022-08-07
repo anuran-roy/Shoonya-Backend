@@ -42,10 +42,7 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
-        if (
-            int(request.user.role) == User.ANNOTATOR
-            or int(request.user.role) == User.WORKSPACE_MANAGER
-        ):
+        if int(request.user.role) in [User.ANNOTATOR, User.WORKSPACE_MANAGER]:
             data = self.queryset.filter(
                 users=request.user,
                 is_archived=False,
@@ -272,7 +269,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
         API for getting all projects of a workspace
         """
         only_active = str(request.GET.get("only_active", "false"))
-        only_active = True if only_active == "true" else False
+        only_active = only_active == "true"
         try:
             workspace = Workspace.objects.get(pk=pk)
         except Workspace.DoesNotExist:
@@ -286,7 +283,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
         else:
             projects = Project.objects.filter(workspace_id=workspace)
 
-        if only_active == True:
+        if only_active:
             projects = projects.filter(is_archived=False)
 
         serializer = ProjectSerializer(projects, many=True)
@@ -323,8 +320,8 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
-        from_date = from_date + " 00:00"
-        to_date = to_date + " 23:59"
+        from_date = f"{from_date} 00:00"
+        to_date = f"{to_date} 23:59"
         tgt_language = request.data.get("tgt_language")
         project_type = request.data.get("project_type")
         # enable_task_reviews = request.data.get("enable_task_reviews")
@@ -351,7 +348,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             )
 
         selected_language = "-"
-        if tgt_language == None:
+        if tgt_language is None:
             projects_objs = Project.objects.filter(
                 workspace_id=pk, project_type=project_type
             )
@@ -463,8 +460,8 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
-        from_date = from_date + " 00:00"
-        to_date = to_date + " 23:59"
+        from_date = f"{from_date} 00:00"
+        to_date = f"{to_date} 23:59"
         tgt_language = request.data.get("tgt_language")
         # enable_task_reviews = request.data.get("enable_task_reviews")
 
@@ -496,7 +493,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
 
         project_type = request.data.get("project_type")
         project_type_lower = project_type.lower()
-        is_translation_project = True if "translation" in project_type_lower else False
+        is_translation_project = "translation" in project_type_lower
         selected_language = "-"
         final_result = []
         for index, each_user in enumerate(users_id):
@@ -508,10 +505,10 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
             if tgt_language != None and tgt_language not in list_of_user_languages:
                 continue
 
-            if email == ws_owner or email == org_owner:
+            if email in [ws_owner, org_owner]:
                 continue
 
-            if tgt_language == None:
+            if tgt_language is None:
                 projects_objs = Project.objects.filter(
                     workspace_id=pk, users=each_user, project_type=project_type
                 )
@@ -557,7 +554,7 @@ class WorkspaceCustomViewSet(viewsets.ViewSet):
                 eachtask.lead_time for eachtask in annotated_labeled_tasks
             ]
             avg_lead_time = 0
-            if len(lead_time_annotated_tasks) > 0:
+            if lead_time_annotated_tasks:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(
                     lead_time_annotated_tasks
                 )
@@ -665,15 +662,12 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
             workspace = Workspace.objects.get(pk=pk)
 
             if (
-                (
-                    (request.user.role) == (User.ORGANIZAION_OWNER)
-                    and (request.user.organization) == (workspace.organization)
-                )
-                or (
-                    (request.user.role == User.WORKSPACE_MANAGER)
-                    and (request.user in workspace.managers.all())
-                )
-            ) == False:
+                request.user.role != User.ORGANIZAION_OWNER
+                or request.user.organization != workspace.organization
+            ) and (
+                request.user.role != User.WORKSPACE_MANAGER
+                or request.user not in workspace.managers.all()
+            ):
                 return Response(
                     {"message": "Not authorized!"}, status=status.HTTP_403_FORBIDDEN
                 )
@@ -691,7 +685,7 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
                     invalid_user_ids.append(user_id)
 
             workspace.save()
-            if len(invalid_user_ids) == 0:
+            if not invalid_user_ids:
                 return Response(
                     {"message": "users added successfully"}, status=status.HTTP_200_OK
                 )
@@ -756,15 +750,12 @@ class WorkspaceusersViewSet(viewsets.ViewSet):
             workspace = Workspace.objects.get(pk=pk)
 
             if (
-                (
-                    (request.user.role) == (User.ORGANIZAION_OWNER)
-                    and (request.user.organization) == (workspace.organization)
-                )
-                or (
-                    (request.user.role == User.WORKSPACE_MANAGER)
-                    and (request.user in workspace.managers.all())
-                )
-            ) == False:
+                request.user.role != User.ORGANIZAION_OWNER
+                or request.user.organization != workspace.organization
+            ) and (
+                request.user.role != User.WORKSPACE_MANAGER
+                or request.user not in workspace.managers.all()
+            ):
                 return Response(
                     {"message": "Not authorized!"}, status=status.HTTP_403_FORBIDDEN
                 )

@@ -115,10 +115,11 @@ def copy_from_ocr_document_to_block_text(request):
             labels = ocr_document.annotation_labels
             labels = json.loads(labels)
 
-            body_transcriptions = []
-            for i, label in enumerate(labels):
-                if label["labels"][0] == "Body":
-                    body_transcriptions.append(transcriptions[i])
+            body_transcriptions = [
+                transcriptions[i]
+                for i, label in enumerate(labels)
+                if label["labels"][0] == "Body"
+            ]
 
             text = " ".join(body_transcriptions)
             # TODO: check if domain can be same as OCR domain

@@ -58,19 +58,14 @@ def get_project_export_status(pk):
     # Create the keyword argument for project ID
     project_id_keyword_arg = "'project_id': " + "'" + str(pk) + "'" + ","
 
-    # Check the celery project export status
-    task_queryset = TaskResult.objects.filter(
+    if task_queryset := TaskResult.objects.filter(
         task_name__in=[
             "projects.tasks.export_project_in_place",
             "projects.tasks.export_project_new_record",
         ],
         # task_name = 'projects.tasks.export_project_in_place',
         task_kwargs__contains=project_id_keyword_arg,
-    )
-
-    # If the celery TaskResults table returns
-    if task_queryset:
-
+    ):
         (
             task_status,
             task_date,
@@ -101,15 +96,10 @@ def get_dataset_upload_status(dataset_instance_pk):
     # Create the keyword argument for dataset instance ID
     instance_id_keyword_arg = "{'pk': " + "'" + str(dataset_instance_pk) + "'" + ","
 
-    # Check the celery project export status
-    task_queryset = TaskResult.objects.filter(
+    if task_queryset := TaskResult.objects.filter(
         task_name="dataset.tasks.upload_data_to_data_instance",
         task_kwargs__contains=instance_id_keyword_arg,
-    )
-
-    # If the celery TaskResults table returns data
-    if task_queryset:
-
+    ):
         (
             task_status,
             task_date,
@@ -151,7 +141,6 @@ def get_dataset_upload_status(dataset_instance_pk):
         else:
             task_status = "Ingestion Successful!"
 
-    # If no entry is found for the celery task
     else:
         task_date = "Synchronously Completed. No Date."
         task_time = "Synchronously Completed. No Time."
@@ -243,8 +232,9 @@ class DatasetInstanceViewSet(viewsets.ModelViewSet):
         dataset_model = apps.get_model("dataset", dataset_instance.dataset_type)
         data_items = dataset_model.objects.filter(instance_id=pk)
         dataset_resource = getattr(
-            resources, dataset_instance.dataset_type + "Resource"
+            resources, f"{dataset_instance.dataset_type}Resource"
         )
+
         exported_items = dataset_resource().export_as_generator(data_items)
         return StreamingHttpResponse(
             exported_items, status=status.HTTP_200_OK, content_type="text/csv"
@@ -290,11 +280,12 @@ class DatasetInstanceViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {
-                    "message": f"Error while reading file. Please check the file data and try again.",
+                    "message": "Error while reading file. Please check the file data and try again.",
                     "exception": str(e),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
 
         # Uplod the dataset to the dataset instance
         upload_data_to_data_instance.delay(

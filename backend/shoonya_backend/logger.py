@@ -17,7 +17,7 @@ class ConsoleFormatter(logging.Formatter):
         default_time_format = "%I:%M:%S %p, %d/%b/%Y"
 
         # Retrieve the status and formatted message from the record
-        msg = f"[{record.levelname}] " + record.getMessage()
+        msg = f"[{record.levelname}] {record.getMessage()}"
         status = record.levelname
 
         # Assign an appropriate color to each level of status

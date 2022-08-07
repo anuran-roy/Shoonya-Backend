@@ -37,7 +37,8 @@ regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
 
 def generate_random_string(length=12):
     return "".join(
-        secrets.choice(string.ascii_uppercase + string.digits) for i in range(length)
+        secrets.choice(string.ascii_uppercase + string.digits)
+        for _ in range(length)
     )
 
 
@@ -91,15 +92,15 @@ class InviteViewSet(viewsets.ViewSet):
             return Response(
                 {"message": "No valid emails found"}, status=status.HTTP_400_BAD_REQUEST
             )
-        if len(invalid_emails) == 0:
-            ret_dict = {"message": "Invites sent"}
-            ret_status = status.HTTP_201_CREATED
-        else:
-            ret_dict = {
+        ret_dict = (
+            {
                 "message": f"Invites sent partially! Invalid emails: {','.join(invalid_emails)}"
             }
-            ret_status = status.HTTP_201_CREATED
+            if invalid_emails
+            else {"message": "Invites sent"}
+        )
 
+        ret_status = status.HTTP_201_CREATED
         users = User.objects.bulk_create(users)
 
         Invite.create_invite(organization=org, users=users)
@@ -310,8 +311,8 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
-        from_date = from_date + " 00:00"
-        to_date = to_date + " 23:59"
+        from_date = f"{from_date} 00:00"
+        to_date = f"{to_date} 23:59"
 
         cond, invalid_message = is_valid_date(from_date)
         if not cond:
@@ -336,7 +337,7 @@ class AnalyticsViewSet(viewsets.ViewSet):
 
         project_type = request.data.get("project_type")
         project_type_lower = project_type.lower()
-        is_translation_project = True if "translation" in project_type_lower else False
+        is_translation_project = "translation" in project_type_lower
         workspace_id = request.data.get("workspace_id")
 
         try:
@@ -399,10 +400,9 @@ class AnalyticsViewSet(viewsets.ViewSet):
             annotated_tasks_count = annotated_labeled_tasks.count()
 
             avg_lead_time = 0
-            lead_time_annotated_tasks = [
+            if lead_time_annotated_tasks := [
                 eachtask.lead_time for eachtask in annotated_labeled_tasks
-            ]
-            if len(lead_time_annotated_tasks) > 0:
+            ]:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(
                     lead_time_annotated_tasks
                 )

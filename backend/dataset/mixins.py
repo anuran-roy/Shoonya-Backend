@@ -16,12 +16,7 @@ class ResourceMixin:
         # Return headers
         yield data.csv
 
-        if isinstance(queryset, QuerySet):
-            # Iterate without the queryset cache, to avoid wasting memory when
-            # exporting large datasets.
-            iterable = queryset.iterator()
-        else:
-            iterable = queryset
+        iterable = queryset.iterator() if isinstance(queryset, QuerySet) else queryset
         for obj in iterable:
             # Return subset of the data (one row)
             # This is a simple implementation to fix the tablib library which is missing returning the data as
