@@ -20,18 +20,18 @@ class ProjectRegistry:
     @staticmethod
     def get_instance():
         """Static access method."""
-        if ProjectRegistry.__instance == None:
+        if ProjectRegistry.__instance is None:
             ProjectRegistry()
         return ProjectRegistry.__instance
 
     def __init__(self):
         """Virtually private constructor."""
-        if ProjectRegistry.__instance != None:
-            # Never instantiate more than once!
-            raise Exception("This class is a singleton!")
-        else:
+        if ProjectRegistry.__instance is None:
             ProjectRegistry.__instance = self
 
+        else:
+            # Never instantiate more than once!
+            raise Exception("This class is a singleton!")
         with open(REGISTRY_PATH, "r", encoding="utf-8") as registry_fp:
             self.data = safe_load(registry_fp)
 

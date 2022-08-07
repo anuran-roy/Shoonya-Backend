@@ -38,9 +38,7 @@ def filter_using_dict_and_model(query_params, model=None):
         return model.objects.filter(**query_params)
     except Exception as e:
         raise Exception(
-            "Error in filtering the model. Error: {}. Check the fields of the query string.".format(
-                e
-            )
+            f"Error in filtering the model. Error: {e}. Check the fields of the query string."
         )
 
 
@@ -66,9 +64,7 @@ def filter_using_dict_and_queryset(query_params, queryset=None):
         return queryset.filter(**query_params).order_by("id")
     except Exception as e:
         raise Exception(
-            "Error in filtering the queryset. Error: {}. Check the fields of the query string.".format(
-                e
-            )
+            f"Error in filtering the queryset. Error: {e}. Check the fields of the query string."
         )
 
 

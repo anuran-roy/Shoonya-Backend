@@ -64,35 +64,36 @@ id_dict = {
 # langs = ['as', 'bd', 'bn', 'gu', 'hi', 'kn', 'ml', 'mni', 'mr', 'sa', 'ne', 'ta', 'te', 'ur']
 langs = ["dg", "or", "gom", "sat", "mai", "ks"]
 
+rows = []
 for lang in langs:
-    if lang == "bd" or lang == "sa" or lang == "mni":
-        with open(f"all_data/hi.txt", "r") as f:
-            lang_lines = f.readlines()
-    elif lang == "dg" or lang == "mai" or lang == "sat":
-        with open(f"all_data/hi.txt", "r") as f:
+    if lang in ["bd", "sa", "mni", "dg", "mai", "sat"]:
+        with open("all_data/hi.txt", "r") as f:
             lang_lines = f.readlines()
     elif lang == "ks":
-        with open(f"all_data/ur.txt", "r") as f:
+        with open("all_data/ur.txt", "r") as f:
             lang_lines = f.readlines()
     elif lang == "gom":
-        with open(f"all_data/mr.txt", "r") as f:
+        with open("all_data/mr.txt", "r") as f:
             lang_lines = f.readlines()
     else:
         with open(f"all_data/{lang}.txt", "r") as f:
             lang_lines = f.readlines()
 
-    with open(f"all_data/en.txt", "r") as f:
+    with open("all_data/en.txt", "r") as f:
         en_lines = f.readlines()
         en_lines = [x.strip() for x in en_lines]
 
-    rows = []
     for i, row in tqdm.tqdm(df.iterrows()):
-        dict_ = {}
+        dict_ = {
+            "input_language": "English",
+            "input_text": row["text"],
+            "output_language": lang_dict[f"{lang}"],
+            "machine_translation": lang_lines[
+                en_lines.index(row["text"])
+            ].strip(),
+        }
 
-        dict_["input_language"] = "English"
-        dict_["input_text"] = row["text"]
-        dict_["output_language"] = lang_dict[f"{lang}"]
-        dict_["machine_translation"] = lang_lines[en_lines.index(row["text"])].strip()
+
         dict_["instance_id"] = id_dict[f"{lang}"]
         dict_["parent_data"] = row["id"]
         dict_["context"] = wiki_contexts[en_lines.index(row["text"])].strip()

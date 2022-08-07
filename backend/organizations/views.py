@@ -77,18 +77,18 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
-        from_date = from_date + " 00:00"
-        to_date = to_date + " 23:59"
+        from_date = f"{from_date} 00:00"
+        to_date = f"{to_date} 23:59"
         tgt_language = request.data.get("tgt_language")
         project_type = request.data.get("project_type")
         project_type_lower = project_type.lower()
-        is_translation_project = True if "translation" in project_type_lower else False
+        is_translation_project = "translation" in project_type_lower
         sort_by_column_name = request.data.get("sort_by_column_name")
         descending_order = request.data.get("descending_order")
-        if sort_by_column_name == None:
+        if sort_by_column_name is None:
             sort_by_column_name = "Annotator"
 
-        if descending_order == None:
+        if descending_order is None:
             descending_order = False
 
         cond, invalid_message = is_valid_date(from_date)
@@ -112,11 +112,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if tgt_language == None:
-            selected_language = "-"
-        else:
-            selected_language = tgt_language
-
+        selected_language = "-" if tgt_language is None else tgt_language
         result = []
         for user in users:
             name = user.username
@@ -130,7 +126,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
             if tgt_language != None and tgt_language not in list_of_user_languages:
                 continue
-            if tgt_language == None:
+            if tgt_language is None:
 
                 total_no_of_tasks_assigned = Task.objects.filter(
                     project_id__in=proj_ids, annotation_users=user
@@ -140,8 +136,6 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 projects_objs = Project.objects.filter(
                     users=user, project_type=project_type, organization_id=organization
                 )
-                no_of_projects = projects_objs.count()
-
             else:
                 total_no_of_tasks_assigned = Task.objects.filter(
                     project_id__in=proj_ids,
@@ -158,7 +152,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                     tgt_language=tgt_language,
                     organization_id=organization,
                 )
-                no_of_projects = projects_objs.count()
+            no_of_projects = projects_objs.count()
 
             annotated_tasks = total_no_of_tasks_assigned.filter(
                 task_status__in=[
@@ -179,10 +173,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             annotated_tasks_count = annotated_labeled_tasks.count()
 
             avg_lead_time = 0
-            lead_time_annotated_tasks = [
+            if lead_time_annotated_tasks := [
                 eachtask.lead_time for eachtask in annotated_labeled_tasks
-            ]
-            if len(lead_time_annotated_tasks) > 0:
+            ]:
                 avg_lead_time = sum(lead_time_annotated_tasks) / len(
                     lead_time_annotated_tasks
                 )
@@ -201,8 +194,9 @@ class OrganizationViewSet(viewsets.ModelViewSet):
             total_draft_tasks_count = total_draft_tasks.count()
 
             no_of_workspaces_objs = len(
-                set([each_proj.workspace_id.id for each_proj in projects_objs])
+                {each_proj.workspace_id.id for each_proj in projects_objs}
             )
+
 
             if is_translation_project:
                 total_word_count_list = [
@@ -254,11 +248,10 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                     "message": "presently sort by word count for non translation projects not activated "
                 }
             )
-        else:
-            final_result = sorted(
-                result, key=lambda x: x[sort_by_column_name], reverse=descending_order
-            )
-            return Response(final_result)
+        final_result = sorted(
+            result, key=lambda x: x[sort_by_column_name], reverse=descending_order
+        )
+        return Response(final_result)
 
     @is_organization_owner
     @action(
@@ -277,17 +270,17 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
-        from_date = from_date + " 00:00"
-        to_date = to_date + " 23:59"
+        from_date = f"{from_date} 00:00"
+        to_date = f"{to_date} 23:59"
         tgt_language = request.data.get("tgt_language")
         project_type = request.data.get("project_type")
 
         sort_by_column_name = request.data.get("sort_by_column_name")
         descending_order = request.data.get("descending_order")
-        if sort_by_column_name == None:
+        if sort_by_column_name is None:
             sort_by_column_name = "User Name"
 
-        if descending_order == None:
+        if descending_order is None:
             descending_order = False
 
         cond, invalid_message = is_valid_date(from_date)
@@ -311,7 +304,7 @@ class OrganizationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if tgt_language == None:
+        if tgt_language is None:
             selected_language = "-"
             projects_obj = Project.objects.filter(
                 organization_id=organization, project_type=project_type
